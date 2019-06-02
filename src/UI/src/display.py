@@ -1,9 +1,9 @@
 #!/usr/bin/python
+from PySide2 import QtCore, QtWidgets, QtGui
 import rospy
 from sensor_msgs.msg import Image
 import cv2, cv_bridge
 import sys
-from PySide2 import QtCore, QtWidgets, QtGui
 import numpy as np
 import time
 import message_filters
@@ -95,7 +95,6 @@ class RGBD_display(QtWidgets.QWidget):
             self.refPt = []
             cv2.destroyWindow("ROI")
             cv2.destroyWindow("ROI_depth")
-            
             print('stop display')
         
     
