@@ -20,17 +20,14 @@ class Crab_3D(object):
             with open(root_keypoint, 'rb') as f:
                 self.keypoints = pickle.load(f)
                 # self.vis_keypoint(self.Crab_2D_proj, self.keypoints)
-        test_keypoints = {"knckle_position": [], "center_position": []}
-        test_keypoints["knckle_position"].append((200, 100))
-        test_keypoints["knckle_position"].append((600, 120))
-        test_keypoints["center_position"].append((0,0))
-        self.model_transform_para(test_keypoints)
+
         
 
     def _display_3D(self, crab_3D):
         mlab.figure('crab_shell')
         mlab.contour3d(crab_3D)
         mlab.show()
+
     def Projection(self, crab_3D):
         crab_2D = 255*np.sum(crab_3D, axis=0)
         crab_2D = crab_2D.astype('uint8')
@@ -103,6 +100,7 @@ class Crab_3D(object):
                         print "two knuckle points has been selected, please press 'r' to reset the selection"
 
     def model_transform_para(self, test_keypoints):
+        ## please follow the order of zoom -> rotate -> translate
         template_diff_x = self.keypoints["knckle_position"][1][0] - self.keypoints["knckle_position"][0][0]
         template_diff_y = self.keypoints["knckle_position"][1][1] - self.keypoints["knckle_position"][0][1]
         template_knuckle_angle = math.atan2(template_diff_y, template_diff_x)
@@ -127,40 +125,38 @@ class Crab_3D(object):
         transformed_knuckle_center = [(self.keypoints["knckle_position"][1][0] + self.keypoints["knckle_position"][0][0]) / 2.0, (self.keypoints["knckle_position"][1][1] + self.keypoints["knckle_position"][0][1]) / 2.0]
         test_knuckle_center = [(test_keypoints["knckle_position"][1][0] + test_keypoints["knckle_position"][0][0]) / 2.0, (test_keypoints["knckle_position"][1][1] + test_keypoints["knckle_position"][0][1]) / 2.0]
         translation_shift = [int(test_knuckle_center[0] - transformed_knuckle_center[0]), int(test_knuckle_center[1] - transformed_knuckle_center[1])]
-        
-        transformed_3D = ndimage.zoom(self.Crab_3D, scale_ratio, mode='nearest')
-        transformed_3D = ndimage.rotate(transformed_3D, rotate_angle, (1, 2)) 
-        print transformed_3D.shape
 
+        return scale_ratio, rotate_angle, translation_shift
+    
+    def model3_zoom(self, scale_ratio, model_in):
+        model_out = ndimage.zoom(model_in, scale_ratio, mode='nearest')
+        return model_out
+    
+    def model3_rotate(self, rotate_angle, model_in):
+        model_out = ndimage.rotate(model_in, rotate_angle, (1, 2)) 
+        return model_out
 
-
-        # 
-        # 
-        # 
-        # transformed_3D = ndimage.shift(transformed_3D, [0, translation_shift[0], translation_shift[1]], mode='nearest')
-        
-
-
-           
-
-        # model translation
-
-        
-        
-
-        transformed_keypoints = {"knckle_position": [], "center_position": []}
-        transformed_keypoints["knckle_position"].append(transformed_knuckle_left)
-        transformed_keypoints["knckle_position"].append(transformed_knuckle_right)
-        transformed_keypoints["center_position"].append(test_keypoints["center_position"][0])
-
-        
-        transformed_2D = self.Projection(transformed_3D)
-        self.vis_keypoint(transformed_2D, transformed_keypoints)
-
-
-        cv2.imshow('transformed_2D', transformed_2D)
-        cv2.waitKey(10000)
-        # print translation_shift
+    def model3_translate(self, translation_shift, model_in):
+        new_shape = (model_in.shape[0], model_in.shape[1] + max(translation_shift[1], 0), model_in.shape[2] + max(translation_shift[0], 0))
+        model_out = np.zeros(new_shape, dtype=np.uint8)
+        model_out[0:model_in.shape[0], 0:model_in.shape[1], 0:model_in.shape[2]] = model_in
+        model_out = ndimage.shift(model_out, [0, translation_shift[1], translation_shift[0]], mode='nearest')
+        return model_out
+    
+    def model2_zoom(self, scale_ratio, image_in):
+        image_out = ndimage.zoom(image_in, scale_ratio, mode='nearest')
+        return image_out
+    
+    def model2_rotate(self, rotate_angle, image_in):
+        image_out = ndimage.rotate(image_in, rotate_angle) 
+        return image_out
+    
+    def model2_translate(self, translation_shift, image_in):
+        new_shape = (image_in.shape[0] + max(translation_shift[1], 0), image_in.shape[1] + max(translation_shift[0], 0))
+        image_out = np.zeros(new_shape, dtype=np.uint8)
+        image_out[0:image_in.shape[0], 0:image_in.shape[1]] = image_in
+        image_out = ndimage.shift(image_out, [translation_shift[1], translation_shift[0]], mode='nearest')
+        return image_out
     
     def point_scaling(self, point_in, scaling_ratio):
         point_out = copy.deepcopy(point_in) 
@@ -190,8 +186,90 @@ class Crab_3D(object):
 
         return point_out
 
+    def point_translation(self, point_in, translation_shift):
+        point_out = copy.deepcopy(point_in) 
+        point_out[0] = point_out[0] + translation_shift[0]
+        point_out[1] = point_out[1] + translation_shift[1]
+        return point_out
 
-if __name__ == "__main__":
+    def model3D2depth(self, model3D, maximum_height=[], minimum_height=[]):
+        if maximum_height == []:
+            maximum_height = model3D.shape[0]
+        if minimum_height == []:
+            minimum_height = 0
 
-    Crab_model = Crab_3D()
-    # Crab_model._display_3D(Crab_model.Crab_3D)    
+        Height_map = np.zeros((model3D.shape[1], model3D.shape[2]), dtype=float)
+        for i in range(model3D.shape[1]):
+            for j in range(model3D.shape[2]):
+                Height_vector = model3D[:, i, j]
+                Height_idx = 0
+                if np.sum(Height_vector) > 0:
+                    Height_idx = np.argwhere(Height_vector)
+                    Height_idx = model3D.shape[0] - np.min(Height_idx)
+                if Height_idx >= maximum_height:
+                    Height_map[i, j] = 255
+                elif Height_idx <= minimum_height:
+                    Height_map[i, j] = 0
+                else:
+                    Height_map[i, j] = (255*(Height_idx - minimum_height)) / (1.0*(maximum_height - minimum_height))
+
+        Height_map = Height_map.astype(np.uint8)
+        return Height_map
+
+
+        
+        
+        
+                
+
+
+# if __name__ == "__main__":
+
+#     Crab_model = Crab_3D()
+
+
+#     test_keypoints = {"knckle_position": [], "center_position": []}
+#     test_keypoints["knckle_position"].append((500, 500))
+#     test_keypoints["knckle_position"].append((600, 520))
+#     test_keypoints["center_position"].append((0,0))
+    
+    
+#     scale_ratio, rotate_angle, translation_shift = Crab_model.model_transform_para(test_keypoints)
+
+#     Height_map = Crab_model.model3D2depth(Crab_model.Crab_3D)
+#     transformed_Height_map = Crab_model.model2_zoom(scale_ratio, Height_map)
+#     transformed_Height_map = Crab_model.model2_rotate(rotate_angle, transformed_Height_map)
+#     transformed_Height_map = Crab_model.model2_translate(translation_shift, transformed_Height_map)
+
+
+#     # transformed_2D = Crab_model.model2_zoom(scale_ratio, Crab_model.Crab_2D_proj)
+#     # transformed_2D = Crab_model.model2_rotate(rotate_angle, transformed_2D)
+#     # transformed_2D = Crab_model.model2_translate(translation_shift, transformed_2D)
+    
+#     # # transformed_3D = Crab_model.model3_zoom(scale_ratio, Crab_model.Crab_3D)
+#     # # transformed_3D = Crab_model.model3_rotate(rotate_angle, transformed_3D)
+#     # # transformed_3D = Crab_model.model3_translate(translation_shift, transformed_3D)
+    
+
+
+#     transformed_knuckle_left = Crab_model.point_scaling(Crab_model.keypoints["knckle_position"][0], scale_ratio)
+#     transformed_knuckle_right = Crab_model.point_scaling(Crab_model.keypoints["knckle_position"][1], scale_ratio)
+#     transformed_center = Crab_model.point_scaling(Crab_model.keypoints["center_position"][0], scale_ratio)
+#     transformed_knuckle_left = Crab_model.point_rotation(transformed_knuckle_left, rotate_angle, scale_ratio)
+#     transformed_knuckle_right = Crab_model.point_rotation(transformed_knuckle_right, rotate_angle, scale_ratio)
+#     transformed_center = Crab_model.point_rotation(transformed_center, rotate_angle, scale_ratio)
+#     transformed_knuckle_left = Crab_model.point_translation(transformed_knuckle_left, translation_shift)
+#     transformed_knuckle_right = Crab_model.point_translation(transformed_knuckle_right, translation_shift)
+#     transformed_center = Crab_model.point_translation(transformed_center, translation_shift)
+
+#     transformed_keypoints = {"knckle_position": [], "center_position": []}
+#     transformed_keypoints["knckle_position"].append(transformed_knuckle_left)
+#     transformed_keypoints["knckle_position"].append(transformed_knuckle_right)
+#     transformed_keypoints["center_position"].append(transformed_center)
+
+#     # Crab_model.vis_keypoint(transformed_2D, transformed_keypoints)
+#     Crab_model.vis_keypoint(transformed_Height_map, transformed_keypoints)
+#     # Crab_model.vis_keypoint(transformed_Height_map, Crab_model.keypoints)
+
+    
+#     # Crab_model._display_3D(Crab_model.Crab_3D)    

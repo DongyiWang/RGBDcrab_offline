@@ -7,15 +7,12 @@ import sys
 import numpy as np
 import time
 import message_filters
-
 from scipy.io import loadmat
 import scipy.ndimage as ndimage
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-# from mayavi import mlab
 import math
 import pickle, copy
-
 
 class Crab_3D(object):
     def __init__(self, root_3D = '..//res//Crab_model_rotate.mat', root_keypoint='..//res//keypoints.pkl'):
@@ -28,29 +25,10 @@ class Crab_3D(object):
         else:
             with open(root_keypoint, 'rb') as f:
                 self.keypoints = pickle.load(f)
-                # self.vis_keypoint(self.Crab_2D_proj, self.keypoints)
-
-        
-
-    # def _display_3D(self, crab_3D):
-    #     mlab.figure('crab_shell')
-    #     mlab.contour3d(crab_3D)
-    #     mlab.show()
 
     def Projection(self, crab_3D):
         crab_2D = 255*np.sum(crab_3D, axis=0)
         crab_2D = crab_2D.astype('uint8')
-        
-        # (height, width) = self.Crab_2D_proj.shape
-        # img_center = (width/2, width/2)
-        # Rotate_base = cv2.getRotationMatrix2D(img_center, 90, 1) 
-        # self.Crab_2D_proj = cv2.warpAffine(self.Crab_2D_proj, Rotate_base, (height, width))
-        # img_center = (height/2, width/2)
-        # Rotate_base = cv2.getRotationMatrix2D(img_center, 180, 1) 
-        # self.Crab_2D_proj = cv2.warpAffine(self.Crab_2D_proj, Rotate_base, (height, width))
-        
-        # cv2.imshow('binary_2D', crab_2D)
-        # cv2.waitKey(10000)
         return crab_2D
 
     def draw_keypoint(self):
@@ -80,19 +58,6 @@ class Crab_3D(object):
         with open('..//res//keypoints.pkl', 'wb') as f:
             pickle.dump(self.keypoints, f)
 
-    def vis_keypoint(self, Crab_2D_proj, keypoints):
-        self.im_display = np.zeros((Crab_2D_proj.shape[0], Crab_2D_proj.shape[1], 3), dtype=np.uint8)
-        self.im_display[:,:,0] = Crab_2D_proj.copy()
-        self.im_display[:,:,1] = Crab_2D_proj.copy()
-        self.im_display[:,:,2] = Crab_2D_proj.copy()
-        cv2.circle(self.im_display, (keypoints["center_position"][0][0], keypoints["center_position"][0][1]), 3, color=(0,0,255), thickness=-1)
-        cv2.circle(self.im_display, (keypoints["knckle_position"][0][0], keypoints["knckle_position"][0][1]), 3, color=(255,0,0), thickness=-1)
-        cv2.circle(self.im_display, (keypoints["knckle_position"][1][0], keypoints["knckle_position"][1][1]), 3, color=(255,0,0), thickness=-1)
-        cv2.namedWindow("Visualize keypoints", 1)
-        cv2.imshow("Visualize keypoints", self.im_display)
-        cv2.waitKey()
-        cv2.destroyWindow("Visualize keypoints")
-
     def click_callback(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
             if self.color != (0, 0, 0):
@@ -107,6 +72,19 @@ class Crab_3D(object):
                         self.keypoints["knckle_position"].append([x, y])
                     else:
                         print "two knuckle points has been selected, please press 'r' to reset the selection"
+    
+    def vis_keypoint(self, Crab_2D_proj, keypoints):
+        self.im_display = np.zeros((Crab_2D_proj.shape[0], Crab_2D_proj.shape[1], 3), dtype=np.uint8)
+        self.im_display[:,:,0] = Crab_2D_proj.copy()
+        self.im_display[:,:,1] = Crab_2D_proj.copy()
+        self.im_display[:,:,2] = Crab_2D_proj.copy()
+        cv2.circle(self.im_display, (keypoints["center_position"][0][0], keypoints["center_position"][0][1]), 3, color=(0,0,255), thickness=-1)
+        cv2.circle(self.im_display, (keypoints["knckle_position"][0][0], keypoints["knckle_position"][0][1]), 3, color=(255,0,0), thickness=-1)
+        cv2.circle(self.im_display, (keypoints["knckle_position"][1][0], keypoints["knckle_position"][1][1]), 3, color=(255,0,0), thickness=-1)
+        # cv2.namedWindow("Visualize keypoints", 1)
+        # cv2.imshow("Visualize keypoints", self.im_display)
+        # cv2.waitKey()
+        # cv2.destroyWindow("Visualize keypoints")
 
     def model_transform_para(self, test_keypoints):
         ## please follow the order of zoom -> rotate -> translate
@@ -130,13 +108,10 @@ class Crab_3D(object):
         transformed_knuckle_left = self.point_rotation(transformed_knuckle_left, rotate_angle, scale_ratio)
         transformed_knuckle_right = self.point_rotation(transformed_knuckle_right, rotate_angle, scale_ratio)
 
-        print transformed_knuckle_left, transformed_knuckle_right
-
-
         transformed_knuckle_center = [(transformed_knuckle_left[0] + transformed_knuckle_right[0]) / 2.0, (transformed_knuckle_left[1] + transformed_knuckle_right[1]) / 2.0]
         test_knuckle_center = [(test_keypoints["knckle_position"][1][0] + test_keypoints["knckle_position"][0][0]) / 2.0, (test_keypoints["knckle_position"][1][1] + test_keypoints["knckle_position"][0][1]) / 2.0]
         translation_shift = [int(test_knuckle_center[0] - transformed_knuckle_center[0]), int(test_knuckle_center[1] - transformed_knuckle_center[1])]
-        print transformed_knuckle_center, test_knuckle_center
+
         return scale_ratio, rotate_angle, translation_shift
     
     def model3_zoom(self, scale_ratio, model_in):
@@ -229,148 +204,117 @@ class Crab_3D(object):
         Height_map = Height_map.astype(np.uint8)
         return Height_map
 
-
-        
-
 class RGBD_display(QtWidgets.QWidget):
     def __init__(self):
         QtWidgets.QWidget.__init__(self)
-        self.bridge = cv_bridge.CvBridge()
-        self.refPt = []
-        self.knuckle_position = []
-        self.ROI_flag = 0
-        self.UI_close_flag = 0
-        self.generate_flag = 0
-        self.knuckle_select_flag = 0
+        self.UI_init()
 
-        self.Crab_model = Crab_3D()
+        #ROS settings
+        self.bridge = cv_bridge.CvBridge()
         self.color_sub = message_filters.Subscriber('camera/color/image_raw', Image)
         self.depth_sub = message_filters.Subscriber('camera/aligned_depth_to_color/image_raw', Image)
         ts = message_filters.ApproximateTimeSynchronizer([self.color_sub, self.depth_sub], 10, 0.1, allow_headerless=True)
         ts.registerCallback(self.image_callback)
-
-        self.setup_ui()
-
-
-    def image_callback(self, msg_color, msg_depth):
-        self.RGB_image = self.bridge.imgmsg_to_cv2(msg_color, desired_encoding='bgr8')
-        self.depth_image = self.bridge.imgmsg_to_cv2(msg_depth)
         
-        if self.UI_close_flag == 0:
-            if len(self.refPt) != 2:
-                cv2.imshow("ROI", self.RGB_image)
-                cv2.imshow("ROI_depth", self.depth_img_norm(self.depth_image))
-            else:
-                cv2.imshow("ROI", self.RGB_image[self.refPt[0][1]:self.refPt[1][1], self.refPt[0][0]:self.refPt[1][0]])
-                cv2.imshow("ROI_depth", self.depth_img_norm(self.depth_image[self.refPt[0][1]:self.refPt[1][1], self.refPt[0][0]:self.refPt[1][0]]))
-            if self.ROI_flag:
-                cv2.imshow("Select ROI", self.im_ROI_select)
-                if len(self.refPt) == 2:
-                    cv2.waitKey()
-                    cv2.destroyWindow("Select ROI")
-                    print('select ROI finish')
-                    self.ROI_flag = 0
-            
-            if self.knuckle_select_flag:
-                cv2.imshow("Select Knuckles", self.im_knuckle_select)
-                if len(self.knuckle_position) != 0:
-                    for i in range(self.knuckle_position.__len__()):
-                        cv2.circle(self.im_knuckle_select, (self.knuckle_position[i][0], self.knuckle_position[i][1]), 3, color=(255,0,0), thickness=-1)
-                if len(self.knuckle_position) == 2:
-                    cv2.waitKey(3) 
-                    cv2.circle(self.im_knuckle_select, (self.knuckle_position[0][0], self.knuckle_position[0][1]), 3, color=(255,0,0), thickness=-1)
-                    cv2.circle(self.im_knuckle_select, (self.knuckle_position[1][0], self.knuckle_position[1][1]), 3, color=(255,0,0), thickness=-1)
-                    cv2.imshow("Select Knuckles", self.im_knuckle_select)
-                    cv2.waitKey()
-                    cv2.destroyWindow("Select Knuckles")
-                    print('select knuckle finish')
-                    self.knuckle_select_flag = 0
-            
-            if self.generate_flag:
-                cv2.imshow("Generated_depth", self.im_display)
+        
+        
+        self.setup_ui()
+    
+    def UI_init(self):
+        
+        self.Crab_model = Crab_3D()
+        # Detect whether the UI has closed 
+        self.Flag_UI = 0
+        self.Flag_ROI_select = 0
+        self.Flag_knckle_select = 0
+        self.Flag_generate_cookie_cut = 0
+        self.Pts_ROI = []
+        self.Pts_knuckle = []
 
-
-            cv2.waitKey(3)    
-
-    def depth_img_norm(self, depth_image):
-        depth_image = depth_image.astype(np.float)
-        print(np.amax(depth_image))
-        depth_image = np.maximum(255*(depth_image - 240) / (np.amax(depth_image) - 240), 0)
-        depth_image = depth_image.astype(np.uint8)
-        return depth_image
-
-
+    
     def setup_ui(self):
-        self.ROI_button = QtWidgets.QPushButton("Select ROI!")
-        self.ROI_button.clicked.connect(self.btn_select_ROI)
+        self.main_layout = QtWidgets.QVBoxLayout()
         self.start_button = QtWidgets.QPushButton("Start!")
         self.start_button.clicked.connect(self.btn_start) 
+        self.main_layout.addWidget(self.start_button)
+        self.setLayout(self.main_layout)
+
         self.stop_button = QtWidgets.QPushButton("Stop!")
         self.stop_button.clicked.connect(self.btn_stop)
+        self.main_layout.addWidget(self.stop_button)
+        
+        self.ROI_button = QtWidgets.QPushButton("Select ROI!")
+        self.ROI_button.clicked.connect(self.btn_select_ROI)
+        self.main_layout.addWidget(self.ROI_button)
+        
         self.select_knuckle_button = QtWidgets.QPushButton("Select Knuckle Position!")
         self.select_knuckle_button.clicked.connect(self.btn_select_knuckle)
+        self.main_layout.addWidget(self.select_knuckle_button)
+
         self.depth_model_button = QtWidgets.QPushButton("Generate depth model!")
         self.depth_model_button.clicked.connect(self.btn_generate_depth_model)
-
-        self.main_layout = QtWidgets.QVBoxLayout()
-        self.main_layout.addWidget(self.start_button)
-        self.main_layout.addWidget(self.ROI_button)
-        self.main_layout.addWidget(self.stop_button)
-        self.main_layout.addWidget(self.select_knuckle_button)
         self.main_layout.addWidget(self.depth_model_button)
-
-        self.setLayout(self.main_layout)
     
-    def btn_select_ROI(self):
-        print('please select ROI:')
-        self.refPt = []
-        self.im_ROI_select = self.RGB_image.copy()
-        cv2.namedWindow("Select ROI", 1)
-        cv2.setMouseCallback("Select ROI", self.click_and_crop)
-        self.ROI_flag = 1
-    
-    def click_and_crop(self, event, x, y, flags, param):
-        if event == cv2.EVENT_LBUTTONDOWN:
-            self.refPt.append((x, y))
-    
-    def btn_select_knuckle(self):
-        print('please select knuckles:')
-        self.knuckle_position = []
-        self.im_knuckle_select = self.RGB_image.copy()
-        cv2.namedWindow("Select Knuckles", 1)
-        cv2.setMouseCallback("Select Knuckles", self.click_knckle)
-        self.knuckle_select_flag = 1
-    
-    def click_knckle(self, event, x, y, flags, param):
-        if event == cv2.EVENT_LBUTTONDOWN:
-            self.knuckle_position.append((x, y))
-        
     def btn_start(self):
-        self.UI_close_flag = 0
-        self.refPt = []
+        self.Flag_UI = 1
+        self.Flag_ROI_select = 0
+        self.Flag_knckle_select = 0
+        self.Flag_generate_cookie_cut = 0
+        self.Pts_ROI = []
+        self.Pts_knuckle = []
     
     def btn_stop(self):
-        if self.ROI_flag:
-            print("please finish ROI selection first")
+        if self.Flag_UI:
+            self.Flag_UI = 0
+            cv2.destroyWindow("RGB_image")
+            cv2.destroyWindow("Depth_image")
+            if self.Flag_ROI_select:
+                cv2.destroyWindow("Select ROI")
+            if self.Flag_knckle_select:
+                cv2.destroyWindow("Select Knuckles")
+            print "you can push 'start' to restart or directly exit the UI"
+    
+    def btn_select_ROI(self):
+        if self.Flag_knckle_select:
+            print 'please finish the knuckle selection'
         else:
-            self.UI_close_flag = 1
-            self.refPt = []
-            cv2.destroyWindow("ROI")
-            cv2.destroyWindow("ROI_depth")
-            print('stop display')
-
+            print 'please select ROI:'
+            self.Pts_ROI = []
+            self.im_ROI_select = self.RGB_image.copy()
+            cv2.namedWindow("Select ROI", 1)
+            cv2.setMouseCallback("Select ROI", self.ROI_click_crop)
+            self.Flag_ROI_select = 1
+    
+    def ROI_click_crop(self, event, x, y, flags, param):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            self.Pts_ROI.append((x, y))
+    
+    def btn_select_knuckle(self):
+        if self.Flag_ROI_select:
+            print 'please finish the ROI selection'
+        else:
+            print 'please select knuckles:'
+            self.Pts_knuckle = []
+            self.im_knuckle_select = self.RGB_image.copy()
+            cv2.namedWindow("Select Knuckles", 1)
+            cv2.setMouseCallback("Select Knuckles", self.knuckle_click)
+            self.Flag_knckle_select = 1
+    
+    def knuckle_click(self, event, x, y, flags, param):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            self.Pts_knuckle.append((x, y))
+    
     def btn_generate_depth_model(self):
-        self.generate_flag = 0
-        if self.knuckle_position.__len__() != 2:
+        self.Flag_generate_cookie_cut = 0
+        if len(self.Pts_knuckle) != 2:
             print('please select knuckle positions correctly')
         else:
-            print self.knuckle_position
+            print self.Pts_knuckle
             test_keypoints = {"knckle_position": [], "center_position": []}
-            test_keypoints["knckle_position"].append(self.knuckle_position[0])
-            test_keypoints["knckle_position"].append(self.knuckle_position[1])
+            test_keypoints["knckle_position"].append(self.Pts_knuckle[0])
+            test_keypoints["knckle_position"].append(self.Pts_knuckle[1])
             test_keypoints["center_position"].append((0,0))
             scale_ratio, rotate_angle, translation_shift = self.Crab_model.model_transform_para(test_keypoints)
-            print scale_ratio, rotate_angle, translation_shift
 
             Height_map = self.Crab_model.model3D2depth(self.Crab_model.Crab_3D)
             transformed_Height_map = self.Crab_model.model2_zoom(scale_ratio, Height_map)
@@ -384,8 +328,6 @@ class RGBD_display(QtWidgets.QWidget):
             transformed_knuckle_right = self.Crab_model.point_rotation(transformed_knuckle_right, rotate_angle, scale_ratio)
             transformed_center = self.Crab_model.point_rotation(transformed_center, rotate_angle, scale_ratio)
 
-            print transformed_knuckle_left, transformed_knuckle_right
-
 
             transformed_knuckle_left = self.Crab_model.point_translation(transformed_knuckle_left, translation_shift)
             transformed_knuckle_right = self.Crab_model.point_translation(transformed_knuckle_right, translation_shift)
@@ -397,25 +339,82 @@ class RGBD_display(QtWidgets.QWidget):
             transformed_keypoints["center_position"].append(transformed_center)
 
 
-            self.im_display = np.zeros((transformed_Height_map.shape[0], transformed_Height_map.shape[1], 3), dtype=np.uint8)
-            self.im_display[:,:,0] = transformed_Height_map.copy()
-            self.im_display[:,:,1] = transformed_Height_map.copy()
-            self.im_display[:,:,2] = transformed_Height_map.copy()
+            self.im_Height_map = np.zeros((transformed_Height_map.shape[0], transformed_Height_map.shape[1], 3), dtype=np.uint8)
+            self.im_Height_map[:,:,0] = transformed_Height_map.copy()
+            self.im_Height_map[:,:,1] = transformed_Height_map.copy()
+            self.im_Height_map[:,:,2] = transformed_Height_map.copy()
 
 
-            cv2.circle(self.im_display, (transformed_keypoints["center_position"][0][0], transformed_keypoints["center_position"][0][1]), 3, color=(0,0,255), thickness=-1)
-            cv2.circle(self.im_display, (transformed_keypoints["knckle_position"][0][0], transformed_keypoints["knckle_position"][0][1]), 3, color=(255,0,0), thickness=-1)
-            cv2.circle(self.im_display, (transformed_keypoints["knckle_position"][1][0], transformed_keypoints["knckle_position"][1][1]), 3, color=(255,0,0), thickness=-1)
+            cv2.circle(self.im_Height_map, (transformed_keypoints["center_position"][0][0], transformed_keypoints["center_position"][0][1]), 3, color=(0,0,255), thickness=-1)
+            cv2.circle(self.im_Height_map, (transformed_keypoints["knckle_position"][0][0], transformed_keypoints["knckle_position"][0][1]), 3, color=(255,0,0), thickness=-1)
+            cv2.circle(self.im_Height_map, (transformed_keypoints["knckle_position"][1][0], transformed_keypoints["knckle_position"][1][1]), 3, color=(255,0,0), thickness=-1)
 
-            self.generate_flag = 1
+            self.Flag_generate_cookie_cut = 1
+        
+    def image_callback(self, msg_color, msg_depth):
+        self.RGB_image = self.bridge.imgmsg_to_cv2(msg_color, desired_encoding='bgr8')
+        self.depth_image = self.bridge.imgmsg_to_cv2(msg_depth)
+        if self.Flag_UI == 1:
+            if len(self.Pts_ROI) != 2:
+                cv2.imshow("RGB_image", self.RGB_image)
+                cv2.imshow("Depth_image", self.depth_img_norm(self.depth_image))
+            else:
+                cv2.imshow("RGB_image", self.RGB_image[self.Pts_ROI[0][1]:self.Pts_ROI[1][1], self.Pts_ROI[0][0]:self.Pts_ROI[1][0]])
+                cv2.imshow("Depth_image", self.depth_img_norm(self.depth_image[self.Pts_ROI[0][1]:self.Pts_ROI[1][1], self.Pts_ROI[0][0]:self.Pts_ROI[1][0]]))
+            
+            if self.Flag_ROI_select:
+                cv2.imshow("Select ROI", self.im_ROI_select)
+                if len(self.Pts_ROI) != 0:
+                    for i in range(len(self.Pts_ROI)):
+                        cv2.circle(self.im_ROI_select, (self.Pts_ROI[i][0], self.Pts_ROI[i][1]), 3, color=(0,255,0), thickness=-1)
+                if len(self.Pts_ROI) == 2:
+                    cv2.waitKey(3) 
+                    cv2.imshow("Select ROI", self.im_ROI_select)
+                    print "Press any key in 'Select ROI' window to exit ROI selection"
+                    cv2.waitKey()
+                    cv2.destroyWindow("Select ROI")
+                    print('ROI selection finish')
+                    self.Flag_ROI_select = 0
+            
+            if self.Flag_knckle_select:
+                cv2.imshow("Select Knuckles", self.im_knuckle_select)
+                if len(self.Pts_knuckle) != 0:
+                    for i in range(len(self.Pts_knuckle)):
+                        cv2.circle(self.im_knuckle_select, (self.Pts_knuckle[i][0], self.Pts_knuckle[i][1]), 3, color=(255,0,0), thickness=-1)
+                if len(self.Pts_knuckle) == 2:
+                    cv2.waitKey(3) 
+                    cv2.imshow("Select Knuckles", self.im_knuckle_select)
+                    print "Press any key in 'Select Knuckles' window to exit knuckle selection"
+                    cv2.waitKey()
+                    cv2.destroyWindow("Select Knuckles")
+                    self.Flag_knckle_select = 0
+                    print('Knuckle selection finish')
+            
+            if self.Flag_generate_cookie_cut:
+                cv2.imshow("Generated depth cookiecut", self.im_Height_map)
+                print "Press any key in 'Generated depth cookiecut' window to exit visualizing generated height map"
+                print "if you want see the height map in real time, please use the superimpose function"
+                cv2.waitKey()
+                cv2.destroyWindow("Generated depth cookiecut")
+                self.Flag_generate_cookie_cut = 0
+                print('Crab height map generated)
+
+    
+    def depth_img_norm(self, depth_image, base_depth=240):
+        depth_image = depth_image.astype(np.float)
+        print(np.amax(depth_image))
+        depth_image = np.maximum(255*(depth_image - base_depth) / (np.amax(depth_image) - base_depth), 0)
+        depth_image = depth_image.astype(np.uint8)
+        return depth_image
+
 
 
 
     def closeEvent(self, event):
-        self.UI_close_flag = 1
+        self.Flag_UI = 0
+        cv2.destroyAllWindows()
         print('Qapp close')
-
-
+    
 if __name__ == "__main__":
     rospy.init_node('display')
     app = QtWidgets.QApplication()
